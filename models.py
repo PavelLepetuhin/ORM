@@ -64,7 +64,7 @@ class Sale(Base):
     count = sq.Column(sq.Integer)
 
     def __str__(self):
-        return f'{self.id} {self.price} {self.date_sale}'
+        return f'{self.id} {self.price} {self.date_sale} {self.count}'
 
     stock = relationship("Stock", back_populates="sale")
 

@@ -1,22 +1,32 @@
+import json
+
 import sqlalchemy as sq
 from sqlalchemy.orm import sessionmaker
-import json
-from models import create_tables, Publisher, Shop, Book, Stock, Sale
-from pprint import pprint
 
-DNS = "postgresql://postgres:77601300@localhost:5432/booksales"
+from config import login, password
+from models import create_tables, Publisher, Shop, Book, Stock, Sale
+
+
+DNS = f"postgresql://{login}:{password}@localhost:5432/booksales"
 engine = sq.create_engine(DNS)
 
 create_tables(engine)
 
 
+def input_value():
+    user_input = input("Введите значение: ")
+    try:
+        value = int(user_input)
+    except ValueError:
+        value = user_input
+    return value
+
+
 Session = sessionmaker(bind=engine)
 session = Session()
 
-
 with open('tests_data.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
-# pprint(data)
 
 
 pub = (item for item in data if item["model"] == "publisher")
@@ -41,34 +51,42 @@ for item in stock:
 
 sale = (item for item in data if item["model"] == "sale")
 for item in sale:
-    sale = Sale(price=item["fields"]["price"], date_sale=item["fields"]["date_sale"], id_stock=item["fields"]["stock"], count=item["fields"]["count"])
+    sale = Sale(price=item["fields"]["price"], date_sale=item["fields"]["date_sale"], id_stock=item["fields"]["stock"],
+                count=item["fields"]["count"])
     session.add(sale)
 
-
 session.commit()
-
 session.close()
-
 
 Session = sessionmaker(bind=engine)
 session = Session()
 
 
 # Ввод издателя (publisher)
-publisher_name = input("Введите имя издателя: ")
+publisher_name = input_value()
 
-# Запрос выборки магазинов, продающих целевого издателя
-shops = session.query(Shop).join(Stock).join(Book).join(Publisher).filter(Publisher.name == publisher_name).all()
-
-# Вывод результатов
-if shops:
-    print(f"Магазины, продающие издателя {publisher_name}:")
+if type(publisher_name) == str:
+    shops = session.query(Stock).join(Book).join(Publisher).join(Shop).join(Sale).filter(
+        Publisher.name == publisher_name).all()
+    print(f"Продажа книг издателя {publisher_name}:")
     for shop in shops:
-        print(shop.name)
-else:
-    print(f"Магазины, продающие издателя {publisher_name}, не найдены")
+        date_ = session.query(Sale).filter(Sale.id_stock == shop.id).first().date_sale
+        price_ = session.query(Sale).filter(Sale.id_stock == shop.id).first().price
+        print(f'{shop.book.title} | {shop.shop.name} | {date_} | {price_}')
+elif type(publisher_name) == int:
+    try:
+        shops = session.query(Stock).join(Book).join(Publisher).join(Shop).join(Sale).filter(
+            Publisher.id == publisher_name).all()
+        publisher_name = session.query(Publisher).filter(Publisher.id == publisher_name).first().name
+        print(f"Продажа книг издателя {publisher_name}:")
+        for shop in shops:
+            date_ = session.query(Sale).filter(Sale.id_stock == shop.id).first().date_sale
+            price_ = session.query(Sale).filter(Sale.id_stock == shop.id).first().price
+            print(f'{shop.book.title} | {shop.shop.name} | {date_} | {price_}')
+    except AttributeError:
+        print("Такого издателя нет в базе данных")
+        exit()
 
 
 session.commit()
-
 session.close()
